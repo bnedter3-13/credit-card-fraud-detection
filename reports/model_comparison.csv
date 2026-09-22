@@ -1,0 +1,13 @@
+model,variant,precision,recall,f1_score,pr_auc,TP,FP,TN,FN
+random_forest,original,0.9405,0.8061,0.8681,0.8608,79,5,56859,19
+random_forest,smote,0.8247,0.8163,0.8205,0.8678,80,17,56847,18
+kmeans,undersampling,0.75,0.3367,0.4648,N/A,33,11,56853,65
+kmeans,smote,0.75,0.3367,0.4648,N/A,33,11,56853,65
+lof,smote,0.2329,0.5204,0.3218,0.1806,51,168,56696,47
+isolation_forest,original,0.3077,0.3265,0.3168,0.1916,32,72,56792,66
+random_forest,undersampling,0.0422,0.9082,0.0806,0.701,89,2022,54842,9
+kmeans,original,0.0025,0.7653,0.005,N/A,75,29994,26870,23
+isolation_forest,undersampling,0.0,0.0,0.0,0.0349,0,0,56864,98
+isolation_forest,smote,0.0,0.0,0.0,0.0326,0,0,56864,98
+lof,original,0.0,0.0,0.0,0.0028,0,100,56764,98
+lof,undersampling,0.0,0.0,0.0,0.0027,0,34,56830,98

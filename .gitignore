@@ -1,0 +1,27 @@
+# Data
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Reports
+reports/figures/*
+!reports/figures/.gitkeep
+
+# OS / Editor
+.DS_Store
+.vscode/
+.idea/
+
+# Claude Code
+.claude/

@@ -25,7 +25,6 @@ st.caption(
     "`reports/best_model_predictions.csv`."
 )
 
-# ---- Header metrics ----
 best_row = comparison_df.sort_values("f1_score", ascending=False).iloc[0]
 total_transactions = len(predictions_df)
 fraud_detected = int((predictions_df["Predicted_Class"] == 1).sum())
@@ -43,7 +42,6 @@ col4.metric(
 
 st.divider()
 
-# ---- Anomaly score distribution ----
 st.subheader("Anomaly Score Distribution")
 st.caption(
     f"`Fraud_Probability` from the best model ({best_row['model']} / "

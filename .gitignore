@@ -25,3 +25,11 @@ reports/figures/*
 
 # Claude Code
 .claude/
+
+# Secrets / credentials
+.env
+.env.*
+*.pem
+*.key
+kaggle.json
+credentials*.json

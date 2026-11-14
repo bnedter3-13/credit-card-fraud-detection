@@ -8,7 +8,7 @@ This project detects fraudulent credit card transactions using eight unsupervise
 
 ## Key Results
 
-All numbers come from [`reports/model_comparison.csv`](reports/model_comparison.csv): 63 rows (10 algorithms plus the extra experiments, each on original / undersampling / SMOTE training data), all scored on the same untouched test set (56,962 transactions, 98 fraud).
+All numbers come from [`reports/model_comparison.csv`](reports/model_comparison.csv): 72 rows — 63 from the main notebook (10 algorithms plus the extra experiments, each on original / undersampling / SMOTE training data) and 9 from the improvement round below — all scored on the same untouched test set (56,962 transactions, 98 fraud). The headline results below are from the main 63 rows.
 
 The best row by test F1 is **`hybrid_random_forest_tuned` trained on the original (unresampled) data**: a Random Forest with an Isolation Forest anomaly score as an extra feature and a validation-chosen threshold (0.44).
 
@@ -42,15 +42,40 @@ What else the experiments showed:
 - **Threshold tuning** lifted resampled supervised models (Random Forest / undersampling F1 0.081 to 0.747) but not Random Forest / original (0.868 to 0.863).
 - **Recall vs. precision:** `random_forest_f2` / original (threshold tuned for F2) raised recall to 87.8% (vs. 80.6%) with precision 82.7% (vs. 94.1%) and F1 0.852 (vs. 0.868). Across three model seeds its recall was 0.874 ± 0.006 but its F1 varied 0.831 ± 0.046, so the F1 change is within noise. Rows with higher recall, such as `logistic_regression_cw` (90.8%), have precision of only about 6%. The Isolation Forest ensembles were worse than Random Forest alone.
 - **Train vs. test:** Random Forest / original has train F1 1.000 vs. test 0.868 (gap +0.13, typical tree-ensemble overfitting); Logistic Regression's gap is +0.02; the unsupervised models have near-zero or slightly negative gaps, and LOF and Elliptic Envelope score 0 on both sides.
-- **Accuracy is not useful here:** it runs from 0.473 to 0.9996, the 28 rows with F1 ≥ 0.5 all sit at 0.998 or above, and models that catch no fraud still score 0.996–0.998.
+- **Accuracy is not useful here:** across the 63 main rows it runs from 0.473 to 0.9996, the 28 rows with F1 ≥ 0.5 all sit at 0.998 or above, and models that catch no fraud still score 0.996–0.998.
 - One-Class SVM (30k rows), DBSCAN (20k rows) and Elliptic Envelope (30k rows) are fit on subsamples.
 
 Details for every row (F2, accuracy, Precision@100, `uses_labels`, `train_f1`, `f1_gap`) are in the CSV and in Section 8 of the notebook.
+
+## Improvement Round (semi-supervised)
+
+A separate step, [`src/improved_models.py`](src/improved_models.py), runs after the main notebook export and appends 9 rows to the CSV. The training set is split again 80/20 into fit / validation; features are ranked with ANOVA F on the fit part, detectors are fitted on normal-only rows with the top-k features (k chosen by validation PR-AUC, never on the test set), and the top 0.17% of test scores are flagged. Supervised rows use thresholds tuned on the validation set.
+
+**These methods use labels** (feature ranking and normal-only training use `y_train`), so they are semi-supervised, not unsupervised; only the baseline row is label-free.
+
+| Model | Precision | Recall | F1 | F2 | Accuracy | PR-AUC |
+|-------|-----------|--------|----|----|----------|--------|
+| `random_forest_balanced_f1` (F1-tuned threshold) | 0.901 | 0.837 | 0.868 | 0.849 | 99.96% | 0.862 |
+| `hybrid_random_forest_balanced_f1` (+ Isolation Forest score) | 0.863 | 0.837 | 0.850 | 0.842 | 99.95% | 0.856 |
+| `unsup_rank_ensemble` (GMM + LOF + Elliptic Envelope) | 0.806 | 0.806 | 0.806 | 0.806 | 99.93% | 0.714 |
+| `lof_fs_novelty` (k=6) | 0.794 | 0.786 | 0.790 | 0.787 | 99.93% | 0.764 |
+| `elliptic_envelope_fs_novelty` (k=15) | 0.794 | 0.786 | 0.790 | 0.787 | 99.93% | 0.684 |
+| `random_forest_balanced_f2` (F2-tuned, recall-oriented) | 0.642 | 0.898 | 0.749 | 0.832 | 99.90% | 0.862 |
+| `gmm_fs_novelty` (k=6) | 0.732 | 0.724 | 0.728 | 0.726 | 99.91% | 0.668 |
+| `isolation_forest_fs_novelty` (k=10) | 0.670 | 0.663 | 0.667 | 0.665 | 99.89% | 0.616 |
+| `isolation_forest_baseline` (label-free, all features) | 0.299 | 0.296 | 0.297 | 0.296 | 99.76% | 0.190 |
+
+- Feature selection plus normal-only training lifts the detectors from F1 0.30 (label-free Isolation Forest) to 0.67–0.81, but only because they use labels.
+- Accuracy is 99.76–99.96% for every row here and says almost nothing: flagging nothing already scores 99.83%.
+- The test set has only 98 frauds, so one extra caught fraud moves recall by about 1 point. Differences of a few points between these rows are within noise; the improved Random Forest (F1 0.868) is not distinguishable from the main notebook's best Random Forest rows (0.863–0.880).
+- The detectors keep the `random_state=0` of the original improvement notebook (Random Forest uses 42), which is why its numbers reproduce within ±0.01.
+- Run it alone with `python -m src.improved_models` (needs `reports/model_comparison.csv` from the main notebook).
 
 ## Project Structure
 
 ```
 notebooks/        Main analysis notebook — EDA, preprocessing, modeling, evaluation
+src/              Improvement-round step (improved_models.py), called from the notebook
 dashboard/        Streamlit app for exploring results (app.py)
 data/raw/         Place creditcard.csv here (not committed)
 data/processed/   Train/test splits written by the notebook (not committed)
@@ -70,11 +95,11 @@ Tested with Python 3.11 and 3.12.
 2. **Get the dataset**
    Download `creditcard.csv` from the [Kaggle Credit Card Fraud Detection page](https://www.kaggle.com/mlg-ulb/creditcardfraud) and place it in `data/raw/`.
 
-3. **Run the notebook** (takes about 14 minutes)
+3. **Run the notebook** (takes about 15 minutes)
    ```
    jupyter notebook notebooks/fraud_detection.ipynb
    ```
-   Run all cells top to bottom — this reproduces the full analysis and exports the CSVs the dashboard needs into `reports/`.
+   Run all cells top to bottom — this reproduces the full analysis, exports the CSVs the dashboard needs into `reports/`, and runs the improvement round (Section 8e).
 
 4. **Launch the dashboard**
    ```

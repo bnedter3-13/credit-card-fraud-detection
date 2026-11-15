@@ -34,16 +34,16 @@ Best row per base algorithm:
 | Gaussian Mixture | original | 0.247 | 0.245 | 0.246 | 0.155 |
 | One-Class SVM | original | 0.058 | 0.806 | 0.108 | 0.137 |
 | Autoencoder (MLPRegressor) | original | 0.062 | 0.061 | 0.062 | 0.047 |
-| Elliptic Envelope | any | 0.000 | 0.000 | 0.000 | ≤0.029 |
+| Elliptic Envelope (`support_fraction=0.99`, top 0.17% rule; `predict` rule F1 0.773; default setting F1 = 0) | original (train part) | 0.825 | 0.816 | 0.820 | 0.684 |
 
 What else the experiments showed:
 
 - **Label-free models:** by Precision@100 (how many of the 100 highest-scoring test transactions are fraud), Isolation Forest / original leads at 31%, then DBSCAN 26%, GMM 24%, `kmeans_distance` 24% and One-Class SVM 22%. `autoencoder_v2` (trained on `Class=0` rows, so it uses labels) reaches F1 0.400 and Precision@100 of 41%, against 0.062 and 6% for the first autoencoder; its undersampling fit did not converge.
 - **Threshold tuning** lifted resampled supervised models (Random Forest / undersampling F1 0.081 to 0.747) but not Random Forest / original (0.868 to 0.863).
 - **Recall vs. precision:** `random_forest_f2` / original (threshold tuned for F2) raised recall to 87.8% (vs. 80.6%) with precision 82.7% (vs. 94.1%) and F1 0.852 (vs. 0.868). Across three model seeds its recall was 0.874 ± 0.006 but its F1 varied 0.831 ± 0.046, so the F1 change is within noise. Rows with higher recall, such as `logistic_regression_cw` (90.8%), have precision of only about 6%. The Isolation Forest ensembles were worse than Random Forest alone.
-- **Train vs. test:** Random Forest / original has train F1 1.000 vs. test 0.868 (gap +0.13, typical tree-ensemble overfitting); Logistic Regression's gap is +0.02; the unsupervised models have near-zero or slightly negative gaps, and LOF and Elliptic Envelope score 0 on both sides.
+- **Train vs. test:** Random Forest / original has train F1 1.000 vs. test 0.868 (gap +0.13, typical tree-ensemble overfitting); Logistic Regression's gap is +0.02; the unsupervised models have near-zero or slightly negative gaps. LOF and the default Elliptic Envelope score 0 on both sides; the validation-tuned Elliptic Envelope (`support_fraction=0.99`) reaches test F1 0.820 (train-vs-test was not computed for it).
 - **Accuracy is not useful here:** across the 63 main rows it runs from 0.473 to 0.9996, the 28 rows with F1 ≥ 0.5 all sit at 0.998 or above, and models that catch no fraud still score 0.996–0.998.
-- One-Class SVM (30k rows), DBSCAN (20k rows) and Elliptic Envelope (30k rows) are fit on subsamples.
+- One-Class SVM (30k rows) and DBSCAN (20k rows) are fit on subsamples. The tuned Elliptic Envelope (`support_fraction=0.99`) is fit on the full 182,276-row train part; the default setting (and the three earlier Elliptic Envelope rows in the main table) fall back to a 30k–40k subsample.
 
 Details for every row (F2, accuracy, Precision@100, `uses_labels`, `train_f1`, `f1_gap`) are in the CSV and in Section 8 of the notebook.
 

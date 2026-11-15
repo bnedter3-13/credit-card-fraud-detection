@@ -8,7 +8,7 @@ This project detects fraudulent credit card transactions using eight unsupervise
 
 ## Key Results
 
-All numbers come from [`reports/model_comparison.csv`](reports/model_comparison.csv): 72 rows — 63 from the main notebook (10 algorithms plus the extra experiments, each on original / undersampling / SMOTE training data) and 9 from the improvement round below — all scored on the same untouched test set (56,962 transactions, 98 fraud). The headline results below are from the main 63 rows.
+All numbers come from [`reports/model_comparison.csv`](reports/model_comparison.csv): 76 rows — 63 from the main notebook (10 algorithms plus the extra experiments, each on original / undersampling / SMOTE training data), 9 from the improvement round and 4 from the Elliptic Envelope follow-up below — all scored on the same untouched test set (56,962 transactions, 98 fraud). The headline results below are from the main 63 rows.
 
 The best row by test F1 is **`hybrid_random_forest_tuned` trained on the original (unresampled) data**: a Random Forest with an Isolation Forest anomaly score as an extra feature and a validation-chosen threshold (0.44).
 
@@ -32,7 +32,7 @@ Best row per base algorithm:
 | Isolation Forest | original | 0.308 | 0.327 | 0.317 | 0.192 |
 | DBSCAN | original | 0.177 | 0.612 | 0.275 | 0.214 |
 | Gaussian Mixture | original | 0.247 | 0.245 | 0.246 | 0.155 |
-| One-Class SVM | original | 0.058 | 0.796 | 0.108 | 0.137 |
+| One-Class SVM | original | 0.058 | 0.806 | 0.108 | 0.137 |
 | Autoencoder (MLPRegressor) | original | 0.062 | 0.061 | 0.062 | 0.047 |
 | Elliptic Envelope | any | 0.000 | 0.000 | 0.000 | ≤0.029 |
 
@@ -46,6 +46,23 @@ What else the experiments showed:
 - One-Class SVM (30k rows), DBSCAN (20k rows) and Elliptic Envelope (30k rows) are fit on subsamples.
 
 Details for every row (F2, accuracy, Precision@100, `uses_labels`, `train_f1`, `f1_gap`) are in the CSV and in Section 8 of the notebook.
+
+### Elliptic Envelope follow-up
+
+A label-free Elliptic Envelope (fitted on the 80% train part, no class filtering) is very sensitive to `support_fraction`. Choosing it by validation PR-AUC from {None, 0.75, 0.9, 0.95, 0.99} picked **0.99** (validation PR-AUC 0.679; the smaller values scored 0.60 or less and the default `None` scored 0.009).
+
+| Row (`uses_labels`) | Rule | Precision | Recall | F1 | PR-AUC | Precision@100 |
+|---------------------|------|-----------|--------|----|--------|---------------|
+| `support_fraction=0.99` (True) | `predict` | 0.734 | 0.816 | 0.773 | 0.684 | 0.80 |
+| `support_fraction=0.99` (True) | top 0.17% | 0.825 | 0.816 | 0.820 | 0.684 | 0.80 |
+| default `None` (False) | `predict` | 0.000 | 0.000 | 0.000 | 0.010 | 0.00 |
+| default `None` (False) | top 0.17% | 0.000 | 0.000 | 0.000 | 0.010 | 0.00 |
+
+- **Assumption:** the top-0.17% rule uses the known fraud rate (it flags 0.17% of test rows), and so does `predict` through `contamination=0.0017`. A real system would not know this rate in advance.
+- **Validation labels:** `support_fraction` was chosen using validation labels, so the chosen rows are marked `uses_labels=True`; only the untuned default is label-free (and scores 0).
+- **Seeds:** the chosen fit uses all training-part rows and is deterministic (identical F1 over 3 seeds). Forced onto a 40k subsample, F1 is 0.759 ± 0.055 for `predict` and 0.8205 ± 0.000 for the top-0.17% rule.
+- **Versus Random Forest** (1,000 bootstrap resamples, 95% CI for F1): Elliptic Envelope 0.773 [0.705, 0.833] and 0.820 [0.757, 0.874]; Random Forest 0.868 [0.811, 0.918]; hybrid tuned 0.880 [0.827, 0.926]. The paired F1 difference to Random Forest is −0.096 and −0.048 for the Elliptic Envelope (intervals exclude 0) and +0.012 [0.000, 0.030] for the hybrid. McNemar on all rows: Elliptic Envelope vs. Random Forest p = 3.4e-05 (`predict`) and 0.019 (top 0.17%), hybrid vs. Random Forest p = 0.50; on the 98 fraud rows alone there is no difference (p = 1.0 / 0.50). The Elliptic Envelope finds as many frauds as Random Forest (80 vs. 79) but with more false positives (17–29 vs. 5).
+- **Preprocessing change:** `Amount` and `Time` are now standardized with scalers fit on the training split only (before, on all rows). 63 of the 72 earlier rows are unchanged; the largest F1 change is 0.016 (One-Class SVM / SMOTE, 0.057 → 0.041), and the headline rows are unchanged.
 
 ## Improvement Round (semi-supervised)
 

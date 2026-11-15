@@ -80,18 +80,16 @@ def _precision_recall_at_k(y_true, score, k=100):
     return tp_k / k, tp_k / int(np.asarray(y_true).sum())
 
 
-def _row(name, uses_labels, y_true, score, thr=None, report_threshold=False):
-    """One result row in the model_comparison.csv column layout."""
-    t = thr if thr is not None else np.quantile(score, 1 - Q)
-    pred = (score >= t).astype(int)
+def row_from_pred(name, uses_labels, y_true, pred, score, threshold=np.nan, variant="original"):
+    """One result row (model_comparison.csv column layout) from given test-set decisions and scores."""
     p, r, f1, _ = precision_recall_fscore_support(y_true, pred, average="binary", zero_division=0)
     tn, fp, fn, tp = confusion_matrix(y_true, pred, labels=[0, 1]).ravel()
     p100, r100 = _precision_recall_at_k(y_true, score)
     return {
         "model": name,
-        "variant": "original",  # fitted on the original (non-resampled) training split
+        "variant": variant,  # fitted on the original (non-resampled) training split
         "uses_labels": bool(uses_labels),
-        "threshold": round(float(thr), 4) if report_threshold else np.nan,
+        "threshold": threshold,
         "precision": round(p, 4),
         "recall": round(r, 4),
         "f1_score": round(f1, 4),
@@ -103,6 +101,14 @@ def _row(name, uses_labels, y_true, score, thr=None, report_threshold=False):
         "TP": int(tp), "FP": int(fp), "TN": int(tn), "FN": int(fn),
         # train_* / f1_gap are not computed for this round -> left empty
     }
+
+
+def _row(name, uses_labels, y_true, score, thr=None, report_threshold=False):
+    """Row for a score-based rule: flag score >= thr, or the top Q fraction of scores if thr is None."""
+    t = thr if thr is not None else np.quantile(score, 1 - Q)
+    pred = (score >= t).astype(int)
+    return row_from_pred(name, uses_labels, y_true, pred, score,
+                         threshold=round(float(thr), 4) if report_threshold else np.nan)
 
 
 def run_improved_rows(data_dir):
@@ -184,17 +190,24 @@ def run_improved_rows(data_dir):
     return rows, diag
 
 
-def append_rows(csv_path, rows):
+def append_rows(csv_path, rows, replace_prefix=None):
     """Append rows to model_comparison.csv without touching existing lines.
 
-    Idempotent: lines written by an earlier run of this step (model names in NEW_MODELS) are dropped
-    first; every other line is kept byte-for-byte.
+    Idempotent: lines written by an earlier run are dropped first (model names in NEW_MODELS, or — if
+    `replace_prefix` is given — only rows whose model starts with that prefix); every other line is kept
+    byte-for-byte.
     """
     csv_path = Path(csv_path)
     with open(csv_path, newline="") as fh:
         lines = fh.read().splitlines(keepends=True)
     header = next(csv.reader([lines[0]]))
-    kept = [lines[0]] + [ln for ln in lines[1:] if ln.split(",", 1)[0] not in NEW_MODELS]
+    def _stale(model):
+        # With replace_prefix only rows starting with that prefix are replaced; by default this step's own rows.
+        if replace_prefix is not None:
+            return model.startswith(replace_prefix)
+        return model in NEW_MODELS
+
+    kept = [lines[0]] + [ln for ln in lines[1:] if not _stale(ln.split(",", 1)[0])]
     if not kept[-1].endswith("\n"):
         kept[-1] += "\n"
     new_lines = []
